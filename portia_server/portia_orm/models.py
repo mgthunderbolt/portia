@@ -374,7 +374,10 @@ class Sample(Model, OrderedAnnotationsMixin):
         items = [a for a in annotations if a.get('item_container')]
         if items:
             return data
-        extractors = json.load(self.context['storage'].open('extractors.json'))
+        try:
+            extractors = json.load(self.context['storage'].open('extractors.json'))
+        except IOError:
+            extractors = None
         annotations = load_annotations(data.get('annotated_body', u''))
         data['plugins'] = annotations
         sample, new_schemas = port_sample(data, schemas, extractors)
@@ -665,14 +668,17 @@ class Annotation(BaseAnnotation):
                 }
             }
 
-        extractors = json.load(self.context['storage'].open('extractors.json'))
-        extractors = OrderedDict([
-            (extractor, {
-                'id': extractor
-            }) for extractor in annotation_data['extractors'] or []
-            if extractor in extractors])
+        try:
+            extractors = json.load(self.context['storage'].open('extractors.json'))
+            extractors = OrderedDict([
+                (extractor, {
+                    'id': extractor
+                }) for extractor in annotation_data['extractors'] or []
+                if extractor in extractors])
+        except IOError:
+            extractors = None
 
-        return {
+        data = {
             'id': '{}|{}'.format(data['id'], data_id),
             'container_id': data['container_id'],
             'attribute': annotation_data['attribute'] or 'content',
@@ -686,8 +692,10 @@ class Annotation(BaseAnnotation):
             'pre_text': data.get('pre_text') or None,
             'post_text': data.get('post_text') or None,
             'field': field,
-            'extractors': extractors,
         }
+        if extractors:
+            data.update({'extractors': extractors})
+        return data
 
     @post_dump
     def set_annotation_data(self, data):
